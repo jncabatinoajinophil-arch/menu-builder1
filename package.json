@@ -1,0 +1,8 @@
+{
+  "name": "menu-builder-mern",
+  "private": true,
+  "scripts": {
+    "build": "npm install --prefix server && npm install --prefix client --include=dev && npm run build --prefix client",
+    "start": "node server/index.js"
+  }
+}

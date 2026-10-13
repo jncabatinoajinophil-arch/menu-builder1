@@ -6,7 +6,9 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
 const { pool, init, save, load } = require('./db');
+const { extractMenu } = require('./importer');
 
 const { JWT_SECRET, PORT = 5000, NODE_ENV, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
 if (!JWT_SECRET || !process.env.DATABASE_URL) { console.error('Set JWT_SECRET and DATABASE_URL in server/.env'); process.exit(1); }
@@ -156,11 +158,24 @@ a.delete('/users/:id', ah(async (req, res) => {
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// ---- import a menu from an uploaded file (Excel, CSV, Word, PDF, image, text) ----
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const importLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 15, keyGenerator: (req) => String(req.user.id),
+  handler: (req, res) => res.status(429).json({ error: 'Import limit reached (15 per hour). Please try again later.' }) });
+app.post('/api/import', auth, importLimiter, upload.single('file'), ah(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Choose a file to upload' });
+  res.json(await extractMenu(req.file));
+}));
+
 // ---- serve the built React app in production ----
 const dist = path.join(__dirname, '../client/dist');
 app.use(express.static(dist));
 app.get(/^\/(?!api).*/, (req, res, next) => res.sendFile(path.join(dist, 'index.html'), (e) => e && next()));
-app.use((e, req, res, next) => { console.error(e); res.status(500).json({ error: 'Server error' }); });
+app.use((e, req, res, next) => {
+  if (e.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'File too large (max 8 MB)' });
+  if (e.status) return res.status(e.status).json({ error: e.message });
+  console.error(e); res.status(500).json({ error: 'Server error' });
+});
 
 init().then(async () => {
   if (ADMIN_EMAIL && ADMIN_PASSWORD && !(await q("SELECT 1 FROM users WHERE role='admin' LIMIT 1")).length) {

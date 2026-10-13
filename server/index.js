@@ -68,7 +68,7 @@ const okMenu = (cats) => Array.isArray(cats) && cats.every((c) => c && str(c.nam
       && m.opts.every((o) => o && str(o.n)))));
 const clean = (b = {}) => ({
   vendor: String(b.vendor || '').trim(),
-  types: (Array.isArray(b.types) ? b.types : []).filter((t) => TYPES.includes(t)),
+  types: (Array.isArray(b.types) ? b.types : []).filter((t) => TYPES.includes(t)).slice(0, 1), // one request type only
   cats: b.cats,
 });
 const REQ_COLS = `r.id, r.vendor, r.types, r.status, r.admin_note AS "adminNote", r.updated_at::float8 AS "updatedAt"`;

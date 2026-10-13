@@ -75,10 +75,10 @@ export default function Editor() {
         </div>
         <div className="card">
           <label>Vendor name<input value={r.vendor} onChange={(e) => upd('vendor', () => e.target.value)} /></label>
-          <label style={{ marginTop: 12 }}>Request type</label>
+          <label style={{ marginTop: 12 }}>Request type (choose one)</label>
           <div className="types">{TYPES.map((t) => (
-            <label key={t}><input type="checkbox" checked={r.types.includes(t)}
-              onChange={(e) => upd('types', (a) => (e.target.checked ? [...a, t] : a.filter((x) => x !== t)))} />{t}</label>
+            <label key={t}><input type="radio" name="request-type" checked={r.types[0] === t}
+              onChange={() => upd('types', () => [t])} />{t}</label>
           ))}</div>
         </div>
         {r.cats.map((c, ci) => { const cp = `cats.${ci}`; return (

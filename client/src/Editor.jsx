@@ -10,6 +10,7 @@ const blank = () => ({ vendor: '', types: ['Add New Item'], status: 'draft', cat
 export default function Editor() {
   const { id } = useParams(), nav = useNavigate(), { user } = useAuth();
   const [r, setR] = useState(id === 'new' ? blank() : null), [msg, setMsg] = useState(''), [errs, setErrs] = useState([]);
+  const [busy, setBusy] = useState(false), [mode, setMode] = useState('add');
   useEffect(() => {
     if (id === 'new') setR(blank()); else api('GET', '/requests/' + id).then(setR).catch((e) => setMsg(e.message));
   }, [id]);
@@ -30,6 +31,20 @@ export default function Editor() {
       onChange={(e) => upd(p, () => /\.(min|max)$/.test(p) && e.target.value !== '' ? +e.target.value : e.target.value)} /></label>
   );
 
+  const importFile = async (e) => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    setBusy(true); setMsg('');
+    try {
+      const fd = new FormData(); fd.append('file', f);
+      const res = await fetch('/api/import', { method: 'POST', body: fd, credentials: 'same-origin' });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || res.statusText);
+      const blankMenu = r.cats.length === 1 && !r.cats[0].name && r.cats[0].products.length === 1 && !r.cats[0].products[0].name;
+      setR((o) => ({ ...o, vendor: o.vendor || j.vendor || '', cats: mode === 'replace' || blankMenu ? j.cats : [...o.cats, ...j.cats] }));
+      setMsg(`Imported ${j.cats.length} categories.${j.truncated ? ' The file was very large and may be incomplete.' : ''} Please review everything, then save.`);
+    } catch (x) { setMsg(x.message); } finally { setBusy(false); }
+  };
   const body = () => ({ vendor: r.vendor, types: r.types, cats: r.cats });
   const persist = async () => (r.id ? api('PUT', '/requests/' + r.id, body()) : api('POST', '/requests', body()));
   const save = async () => {
@@ -48,6 +63,16 @@ export default function Editor() {
       {r.adminNote && <div className="card note"><b>Admin note:</b> {r.adminNote}</div>}
       {locked && <div className="card">This request was submitted and is locked. You can still download it.</div>}
       <fieldset disabled={locked}>
+        <div className="card">
+          <h3>Import from a file</h3>
+          <p className="note">Upload a menu as Excel, CSV, Word, PDF, a photo or a text file. The system reads it and fills in the form below. Always review before saving.</p>
+          <div className="g">
+            <label>File<input type="file" disabled={busy} onChange={importFile} accept=".xlsx,.csv,.docx,.pdf,.txt,.png,.jpg,.jpeg,.webp,.gif" /></label>
+            <label>If the form already has items<select value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="add">Add to what I have</option><option value="replace">Replace everything</option></select></label>
+          </div>
+          {busy && <p className="note">Reading your file… this can take up to a minute.</p>}
+        </div>
         <div className="card">
           <label>Vendor name<input value={r.vendor} onChange={(e) => upd('vendor', () => e.target.value)} /></label>
           <label style={{ marginTop: 12 }}>Request type</label>
